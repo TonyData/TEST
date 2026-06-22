@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Image Reveal</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#f4f6f8;color:#182022;font-family:system-ui,-apple-system,Segoe UI,sans-serif}.page{min-height:100svh;display:flex;align-items:center;padding:24px}.compact{min-height:auto;padding:12px}.game{width:min(100%,720px);margin:auto;background:#fff;border:1px solid #dbe3e6;border-radius:8px;box-shadow:0 20px 60px #1820221f;padding:18px;display:grid;gap:14px}.compact .game{box-shadow:none;max-width:620px;padding:12px}.top,.controls{display:flex;align-items:center;justify-content:space-between;gap:12px}.top{border-bottom:1px solid #cfd8dc;padding-bottom:12px}.eyebrow{margin:0 0 4px;color:#4e676d;font-size:.72rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase}h1{margin:0;font-size:clamp(1.7rem,5vw,3rem);line-height:1}.status{border:1px solid #b9c7cb;border-radius:999px;color:#30494f;font-size:.82rem;font-weight:800;padding:7px 12px;white-space:nowrap}.playing{border-color:#21877a;color:#0e675d}.won{background:#e2f5e7;border-color:#45a460;color:#1d6b37}.score{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) 40px;gap:4px;background:#eef3f4;border:1px solid #d4dee1;border-radius:8px;padding:8px}.score span{display:block;color:#536a70;font-size:.7rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase}.score b{font-size:clamp(1.1rem,4vw,1.45rem)}button{font:inherit}.reset,.mode,.preset{min-height:40px;border:1px solid #b9c8cc;border-radius:8px;cursor:pointer;font-weight:800}.reset{width:40px;background:#182022;color:#fff}.reset:before{content:"R";font-size:1rem}.board-wrap{display:flex;justify-content:center;overflow:auto}.board{--cell:clamp(30px,8.5vw,48px);--cols:8;position:relative;display:grid;grid-template-columns:repeat(var(--cols),minmax(0,1fr));gap:2px;width:min(100%,calc(var(--cols)*var(--cell) + (var(--cols) - 1)*2px + 6px));aspect-ratio:var(--cols)/var(--rows);background:#94a3a8;border:3px solid #94a3a8;border-radius:8px;overflow:hidden}.image{position:absolute;inset:3px;background-image:var(--image);background-size:cover;background-position:center;border-radius:5px}.cell{position:relative;z-index:1;aspect-ratio:1;border:0;border-radius:3px;background:linear-gradient(145deg,#ffffff7a,#fff0) #bfccd0;box-shadow:inset 1px 1px #ffffffad,inset -1px -1px #34454a38;color:#1e293b;font-size:clamp(.9rem,3.8vw,1.25rem);font-weight:900;display:grid;place-items:center;padding:0;touch-action:manipulation;transition:opacity .16s ease,transform .16s ease}.cell:hover{background-color:#cdd8db}.cell.open{opacity:0;pointer-events:none;transform:scale(.94)}.mode{background:#fff;color:#1d3035;padding:0 14px}.mode.active,.preset.active{background:#dff5f0;border-color:#239486;color:#0f665c}.presets{display:grid;grid-template-columns:repeat(3,minmax(74px,1fr));gap:6px}.preset{background:#fff;color:#3d5359;padding:0 10px}.hint{color:#536a70;font-size:.9rem;line-height:1.45;margin:0}@media(max-width:560px){.page{align-items:flex-start;padding:10px}.game{padding:12px}.score{grid-template-columns:repeat(3,minmax(0,1fr)) 38px}.controls{align-items:stretch;display:grid}.presets{grid-template-columns:repeat(3,minmax(0,1fr))}}
+  </style>
+</head>
+<body>
+  <main id="page" class="page">
+    <section class="game">
+      <header class="top"><div><p class="eyebrow">Qualtrics-ready</p><h1>Image reveal</h1></div><div id="status" class="status">Pret</div></header>
+      <div class="score"><div><span>Cases</span><b id="left">64</b></div><div><span>Temps</span><b id="time">00:00</b></div><div><span>Clics</span><b id="moves">0</b></div><button id="reset" class="reset" aria-label="Nouvelle partie"></button></div>
+      <div class="board-wrap"><div id="board" class="board" role="grid"><div id="image" class="image"></div></div></div>
+      <footer class="controls"><button id="reveal" class="mode" type="button">Tout voir</button><div id="presets" class="presets"></div></footer>
+      <p class="hint">Cliquez sur les cases pour reveler l'image progressivement.</p>
+    </section>
+  </main>
+  <script>
+    const presets=[["8 x 8",8,8],["10 x 10",10,10],["12 x 10",10,12]], copy={ready:"Pret",playing:"En cours",won:"Termine"};
+    let s,cells,status,start,elapsed,moves,timer;
+    const $=id=>document.getElementById(id), page=$("page"), board=$("board"), statusEl=$("status"), leftEl=$("left"), timeEl=$("time"), movesEl=$("moves"), presetsEl=$("presets"), imageEl=$("image");
+    function clamp(v,f,min,max){return Number.isFinite(v)?Math.min(Math.max(Math.round(v),min),max):f}
+    function settings(){const p=new URLSearchParams(location.search), num=(n,f)=>{const v=p.get(n);return v&&v.trim()?Number(v):f}, rows=clamp(num("rows",8),8,3,16), cols=clamp(num("cols",8),8,3,16);return{rows,cols,seed:(p.get("seed")||"").slice(0,80),locked:p.get("lock")==="1",compact:p.get("compact")==="1",image:p.get("image")||""}}
+    function fallbackImage(){return "linear-gradient(135deg,#f8fafb 0%,#f8fafb 28%,#dff5f0 28%,#dff5f0 55%,#f3a19a 55%,#f3a19a 72%,#94a3a8 72%)"}
+    function setStatus(v){status=v;statusEl.textContent=copy[v];statusEl.className=`status ${v}`;if(v==="playing"||v==="won")post(v==="won"?"complete":v)}
+    function summary(){return{cols:s.cols,elapsedSeconds:elapsed,moves,revealed:cells.filter(Boolean).length,total:s.rows*s.cols,rows:s.rows,seed:s.seed||null,status}}
+    function post(event){parent?.postMessage({event,source:"qualtrics-image-reveal",summary:summary()},"*")}
+    function tick(){if(timer)clearInterval(timer);timer=setInterval(()=>{if(status==="playing"&&start){elapsed=Math.floor((Date.now()-start)/1000);stats()}},250)}
+    function stats(){leftEl.textContent=String(cells.length-cells.filter(Boolean).length);timeEl.textContent=`${String(Math.floor(elapsed/60)).padStart(2,"0")}:${String(elapsed%60).padStart(2,"0")}`;movesEl.textContent=moves}
+    function open(i){if(cells[i]||status==="won")return;if(status==="ready"){start=Date.now();setStatus("playing");tick()}cells[i]=true;moves++;if(cells.every(Boolean)){elapsed=Math.floor((Date.now()-start)/1000);setStatus("won")}render()}
+    function renderBoard(){board.style.setProperty("--cols",s.cols);board.style.setProperty("--rows",s.rows);board.querySelectorAll(".cell").forEach(n=>n.remove());cells.forEach((opened,i)=>{const el=document.createElement("button");el.type="button";el.className=opened?"cell open":"cell";el.setAttribute("role","gridcell");el.setAttribute("aria-label",opened?`Case ${i+1}, revelee`:`Case ${i+1}, cachee`);el.onclick=()=>open(i);board.appendChild(el)})}
+    function renderPresets(){presetsEl.hidden=s.locked;presetsEl.innerHTML="";if(s.locked)return;presets.forEach(p=>{const el=document.createElement("button");el.className=p[1]===s.rows&&p[2]===s.cols?"preset active":"preset";el.textContent=p[0];el.onclick=()=>reset({...s,rows:p[1],cols:p[2]});presetsEl.appendChild(el)})}
+    function render(){stats();renderBoard();renderPresets()}
+    function reset(ns=s){s=ns;cells=Array.from({length:s.rows*s.cols},()=>false);start=null;elapsed=0;moves=0;page.className=s.compact?"page compact":"page";imageEl.style.setProperty("--image",s.image?`url("${s.image.replace(/"/g,"%22")}")`:fallbackImage());setStatus("ready");render()}
+    $("reset").onclick=()=>reset();$("reveal").onclick=()=>{if(status==="ready"){start=Date.now();setStatus("playing")}cells=cells.map(()=>true);elapsed=start?Math.floor((Date.now()-start)/1000):0;moves+=1;setStatus("won");render()};s=settings();reset(s);post("ready");
+  </script>
+</body>
+</html>
