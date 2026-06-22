@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ambiguous Mines</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#f4f6f8;color:#182022;font-family:system-ui,-apple-system,Segoe UI,sans-serif}.page{min-height:100svh;display:flex;align-items:center;padding:24px}.compact{min-height:auto;padding:12px}.game{width:min(100%,720px);margin:auto;background:#fff;border:1px solid #dbe3e6;border-radius:8px;box-shadow:0 20px 60px #1820221f;padding:18px;display:grid;gap:14px}.compact .game{box-shadow:none;max-width:620px;padding:12px}.top,.controls{display:flex;align-items:center;justify-content:space-between;gap:12px}.top{border-bottom:1px solid #cfd8dc;padding-bottom:12px}.eyebrow{margin:0 0 4px;color:#4e676d;font-size:.72rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase}h1{margin:0;font-size:clamp(1.7rem,5vw,3rem);line-height:1}.status{border:1px solid #b9c7cb;border-radius:999px;color:#30494f;font-size:.82rem;font-weight:800;padding:7px 12px;white-space:nowrap}.playing{border-color:#21877a;color:#0e675d}.won{background:#e2f5e7;border-color:#45a460;color:#1d6b37}.lost{background:#fde7e5;border-color:#d85b50;color:#9d2b22}.score{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) 40px;gap:4px;background:#eef3f4;border:1px solid #d4dee1;border-radius:8px;padding:8px}.score span{display:block;color:#536a70;font-size:.7rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase}.score b{font-size:clamp(1.1rem,4vw,1.45rem)}button{font:inherit}.reset,.mode,.preset{min-height:40px;border:1px solid #b9c8cc;border-radius:8px;cursor:pointer;font-weight:800}.reset{width:40px;background:#182022;color:#fff}.reset:before{content:"R";font-size:1rem}.board-wrap{display:flex;justify-content:center;overflow:auto}.board{--cell:clamp(30px,8.5vw,48px);display:grid;grid-template-columns:repeat(var(--cols),minmax(0,1fr));gap:2px;width:min(100%,calc(var(--cols)*var(--cell) + (var(--cols) - 1)*2px + 6px));background:#94a3a8;border:3px solid #94a3a8;border-radius:8px}.cell{aspect-ratio:1;border:0;border-radius:3px;background:linear-gradient(145deg,#ffffff7a,#fff0) #bfccd0;box-shadow:inset 1px 1px #ffffffad,inset -1px -1px #34454a38;color:#1e293b;font-size:clamp(.72rem,3.2vw,1rem);font-weight:900;display:grid;place-items:center;padding:0;touch-action:manipulation}.cell.open{background:#f8fafb;box-shadow:inset 0 0 0 1px #28373c14;cursor:default;color:#0f665c}.cell.boom{background:#f3a19a;color:#9d2b22}.mode{background:#fff;color:#1d3035;padding:0 14px}.mode.active,.preset.active{background:#dff5f0;border-color:#239486;color:#0f665c}.presets{display:grid;grid-template-columns:repeat(3,minmax(74px,1fr));gap:6px}.preset{background:#fff;color:#3d5359;padding:0 10px}.hint{color:#536a70;font-size:.9rem;line-height:1.45;margin:0}@media(max-width:560px){.page{align-items:flex-start;padding:10px}.game{padding:12px}.score{grid-template-columns:repeat(3,minmax(0,1fr)) 38px}.controls{align-items:stretch;display:grid}.presets{grid-template-columns:repeat(3,minmax(0,1fr))}}
+  </style>
+</head>
+<body>
+  <main id="page" class="page">
+    <section class="game">
+      <header class="top"><div><p class="eyebrow">Qualtrics-ready</p><h1>Ambiguous mines</h1></div><div id="status" class="status">Pret</div></header>
+      <div class="score"><div><span>Risque</span><b>?</b></div><div><span>Temps</span><b id="time">00:00</b></div><div><span>Coups</span><b id="moves">0</b></div><button id="reset" class="reset" aria-label="Nouvelle partie"></button></div>
+      <div class="board-wrap"><div id="board" class="board" role="grid"></div></div>
+      <footer class="controls"><button id="flag" class="mode" type="button">F Drapeau</button><div id="presets" class="presets"></div></footer>
+      <p class="hint">Les cases sures affichent OK. Aucune information n'indique le nombre de mines ni leur proximite.</p>
+    </section>
+  </main>
+  <script>
+    const presets=[["8 x 8",8,8,10],["10 x 10",10,10,15],["12 x 10",10,12,20]], copy={ready:"Pret",playing:"En cours",won:"Gagne",lost:"Perdu"};
+    let s,b,status,flagMode,start,elapsed,moves,timer;
+    const $=id=>document.getElementById(id), page=$("page"), board=$("board"), statusEl=$("status"), timeEl=$("time"), movesEl=$("moves"), flagEl=$("flag"), presetsEl=$("presets");
+    function clamp(v,f,min,max){return Number.isFinite(v)?Math.min(Math.max(Math.round(v),min),max):f}
+    function settings(){const p=new URLSearchParams(location.search), num=(n,f)=>{const v=p.get(n);return v&&v.trim()?Number(v):f}, rows=clamp(num("rows",8),8,5,16), cols=clamp(num("cols",8),8,5,16);return{rows,cols,mines:clamp(num("mines",10),10,1,rows*cols-1),seed:(p.get("seed")||"").slice(0,80),locked:p.get("lock")==="1",compact:p.get("compact")==="1"}}
+    function empty(){return Array.from({length:s.rows*s.cols},()=>({m:false,o:false,f:false,x:false}))}
+    function neigh(i){const r=Math.floor(i/s.cols),c=i%s.cols,a=[];for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){if(!dr&&!dc)continue;const nr=r+dr,nc=c+dc;if(nr>=0&&nr<s.rows&&nc>=0&&nc<s.cols)a.push(nr*s.cols+nc)}return a}
+    function hash(str){let h=2166136261;for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0}
+    function rng(seed){let v=hash(seed||`${Date.now()}-${Math.random()}`);return()=>{v+=0x6d2b79f5;let t=v;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296}}
+    function mine(first){const nb=b.map(c=>({...c})), zone=new Set([first,...neigh(first)]), reserved=s.rows*s.cols-zone.size>s.mines?zone:new Set([first]), avail=Array.from({length:s.rows*s.cols},(_,i)=>i).filter(i=>!reserved.has(i)), r=rng(`${s.seed||"random"}:${s.rows}:${s.cols}:${s.mines}:${first}`);for(let i=avail.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[avail[i],avail[j]]=[avail[j],avail[i]]}avail.slice(0,s.mines).forEach(i=>nb[i].m=true);return nb}
+    function won(src){return src.filter(c=>c.o&&!c.m).length===s.rows*s.cols-s.mines}
+    function summary(){return{cols:s.cols,elapsedSeconds:elapsed,flags:b.filter(c=>c.f&&!c.o).length,mines:null,moves,revealed:b.filter(c=>c.o&&!c.m).length,rows:s.rows,seed:s.seed||null,status}}
+    function post(event){parent?.postMessage({event,source:"qualtrics-ambiguous-mines",summary:summary()},"*")}
+    function setStatus(v){status=v;statusEl.textContent=copy[v];statusEl.className=`status ${v}`;if(["playing","won","lost"].includes(v))post(v==="won"?"complete":v)}
+    function tick(){if(timer)clearInterval(timer);timer=setInterval(()=>{if(status==="playing"&&start){elapsed=Math.floor((Date.now()-start)/1000);stats()}},250)}
+    function open(i){if(status==="won"||status==="lost"||b[i].f||b[i].o)return;const t=start||Date.now(), seeded=status==="ready"?mine(i):b;if(status==="ready"){start=t;setStatus("playing");tick()}moves++;if(seeded[i].m){b=seeded.map((c,k)=>c.m?{...c,o:true,x:k===i}:c);elapsed=Math.floor((Date.now()-t)/1000);setStatus("lost");render();return}seeded[i].o=true;if(won(seeded)){b=seeded.map(c=>c.m?{...c,f:true}:c);elapsed=Math.floor((Date.now()-t)/1000);setStatus("won");render();return}b=seeded;render()}
+    function toggle(i){if(status==="won"||status==="lost"||b[i].o)return;b[i].f=!b[i].f;render()}
+    function stats(){timeEl.textContent=`${String(Math.floor(elapsed/60)).padStart(2,"0")}:${String(elapsed%60).padStart(2,"0")}`;movesEl.textContent=moves}
+    function render(){stats();board.style.setProperty("--cols",s.cols);board.innerHTML="";b.forEach((c,i)=>{const el=document.createElement("button");el.type="button";el.className=`cell ${c.o?"open":""} ${c.x?"boom":""}`;el.disabled=status==="won"||status==="lost";el.setAttribute("aria-label",c.o&&c.m?"Mine":c.o?"Case sure":c.f?"Drapeau":"Case cachee");el.textContent=c.f&&!c.o?"F":c.o&&c.m?"*":c.o&&!c.m?"OK":"";el.onclick=()=>flagMode?toggle(i):open(i);el.oncontextmenu=e=>{e.preventDefault();toggle(i)};board.appendChild(el)});flagEl.className=flagMode?"mode active":"mode";presetsEl.hidden=s.locked;presetsEl.innerHTML="";if(!s.locked)presets.forEach(p=>{const el=document.createElement("button");el.className=p[1]===s.rows&&p[2]===s.cols&&p[3]===s.mines?"preset active":"preset";el.textContent=p[0];el.onclick=()=>reset({...s,rows:p[1],cols:p[2],mines:p[3]});presetsEl.appendChild(el)})}
+    function reset(ns=s){s=ns;b=empty();flagMode=false;start=null;elapsed=0;moves=0;page.className=s.compact?"page compact":"page";setStatus("ready");render()}
+    $("reset").onclick=()=>reset();flagEl.onclick=()=>{flagMode=!flagMode;render()};s=settings();reset(s);post("ready");
+  </script>
+</body>
+</html>
