@@ -19,7 +19,7 @@
     </section>
   </main>
   <script>
-    const presets=[["8 x 8",8,8],["10 x 10",10,10],["12 x 10",10,12]], copy={ready:"Pret",playing:"En cours",won:"Termine"};
+    const presets=[["8 x 8",8,8],["10 x 10",10,10],["12 x 10",10,12]], copy={ready:"Ready",playing:"Playing",won:"Won"};
     let s,cells,status,start,elapsed,moves,timer;
     const $=id=>document.getElementById(id), page=$("page"), board=$("board"), statusEl=$("status"), leftEl=$("left"), timeEl=$("time"), movesEl=$("moves"), presetsEl=$("presets"), imageEl=$("image");
     function clamp(v,f,min,max){return Number.isFinite(v)?Math.min(Math.max(Math.round(v),min),max):f}
